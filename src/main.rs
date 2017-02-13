@@ -24,19 +24,24 @@ fn main() {
         .and_then(|socket| {
             let transport = socket.framed(IrcCodec::new());
             let lines_to_send: Vec<Result<String, std::io::Error>> =
-                vec![Ok("NICK bot".to_string()), Ok("USER bot 8 * :Bot".to_string())];
+                vec![Ok("NICK bot".to_string()), Ok("USER bot 8 * :Bot".to_string()), Ok("JOIN #main".to_string())];
             transport.send_all(stream::iter(lines_to_send))
         })
         .and_then(|(transport, _results)| {
-            transport.for_each(|l| {
+            let (sink, strm) = transport.split();
+            sink.send_all(strm.filter_map(|l| {
                 println!("{:?}", l);
                 if l.contains("PING") {
-                    // TODO how do i send back a PONG?
+                    let response = "PONG :irc.example.net".to_string();
+                    println!("Sending {:?}", response);
+                    Some(response)
+                } else {
+                    None
                 }
-                Ok(())
-            })
+            }))
         })
         .and_then(|_| Ok(()));
 
-    core.run(work).unwrap();
+    let r = core.run(work);
+    println!("{:?}", r);
 }
